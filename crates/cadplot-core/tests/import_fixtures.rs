@@ -104,6 +104,7 @@ fn check_report(v: Variant, r: &ImportReport, exp: &Expected) {
     assert_eq!(r.drawing.insunits_code, 4, "{ctx}: mm");
     if v.version() >= acadrust::DxfVersion::AC1021 {
         assert_eq!(r.drawing.cannoscale, "1:50", "{ctx}: CANNOSCALE");
+        assert!((r.drawing.cannoscale_value - 0.02).abs() < 1e-12, "{ctx}: CANNOSCALEVALUE {}", r.drawing.cannoscale_value);
     }
 
     // Layout e viewport 1:50.
@@ -189,5 +190,27 @@ fn dxf_r12_windows_1252() {
     assert_eq!(count(&r, "INSERT").1, 1);
     let poly = count(&r, "POLYLINE").1 + count(&r, "POLYLINE_2D").1;
     assert_eq!(poly, 1, "{:#?}", r.entities.by_type);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+/// Desempenho: 500 mil entidades devem abrir em menos de 10 s.
+/// Rodar em release: cargo test --release -p cadplot-core --test import_fixtures -- --ignored desempenho --nocapture
+#[test]
+#[ignore]
+fn desempenho_500k() {
+    let dir = tmp_dir("perf");
+    let path = dir.join("grande.dwg");
+    let doc = cadplot_fixtures::planta_grande(500_000);
+    cadplot_fixtures::write_doc_dwg(&path, &doc).unwrap();
+    let size = std::fs::metadata(&path).unwrap().len();
+    let t = std::time::Instant::now();
+    let r = import_file(&path, &ImportOptions::default()).unwrap().report;
+    let secs = t.elapsed().as_secs_f64();
+    eprintln!(
+        "500k: {} entidades, {:.1} MB, {:.2} s (E/S {:.0} ms, leitura {:.0} ms, análise {:.0} ms)",
+        r.entities.total, size as f64 / 1e6, secs, r.timing.io_ms, r.timing.parse_ms, r.timing.analyze_ms
+    );
+    assert!(r.entities.model_space >= 500_000);
+    assert!(secs < 10.0, "abrir 500k levou {secs:.2} s");
     std::fs::remove_dir_all(&dir).ok();
 }

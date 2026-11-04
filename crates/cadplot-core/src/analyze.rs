@@ -535,8 +535,17 @@ fn resolve_cannoscale(doc: &CadDocument) -> (String, f64, &'static str) {
             }
             _ => None,
         })
-        .unwrap_or(if name == h.current_annotation_scale { h.annotation_scale_value } else { f64::NAN });
+        .or_else(|| parse_scale_name(&name))
+        .unwrap_or(h.annotation_scale_value);
     (name, value, source)
+}
+
+/// "1:50" → 0,02; "2:1" → 2. Usado quando não existe o objeto SCALE correspondente.
+pub fn parse_scale_name(name: &str) -> Option<f64> {
+    let (a, b) = name.trim().split_once(':')?;
+    let a: f64 = a.trim().replace(',', ".").parse().ok()?;
+    let b: f64 = b.trim().replace(',', ".").parse().ok()?;
+    (a > 0.0 && b > 0.0).then(|| a / b)
 }
 
 fn warn(list: &mut Vec<Warning>, level: WarningLevel, key: &str, message: String) {
@@ -840,5 +849,13 @@ mod tests {
         assert_eq!(layer_prefix("ARQ_PAREDE"), Some("ARQ"));
         assert_eq!(layer_prefix("0"), None);
         assert_eq!(layer_prefix("-X"), None);
+    }
+
+    #[test]
+    fn nomes_de_escala() {
+        assert_eq!(parse_scale_name("1:50"), Some(0.02));
+        assert_eq!(parse_scale_name("2:1"), Some(2.0));
+        assert_eq!(parse_scale_name("1:12,5"), Some(0.08));
+        assert_eq!(parse_scale_name("Escala"), None);
     }
 }

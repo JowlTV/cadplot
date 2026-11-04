@@ -351,3 +351,8 @@ pub fn planta_grande(n_entities: usize) -> CadDocument {
     }
     doc
 }
+
+/// Grava um documento qualquer em DWG (só para fixtures).
+pub fn write_doc_dwg(path: &Path, doc: &CadDocument) -> Result<(), String> {
+    DwgWriter::write_to_file(path, doc).map_err(|e| e.to_string())
+}
