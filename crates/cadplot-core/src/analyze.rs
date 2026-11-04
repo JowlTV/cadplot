@@ -153,6 +153,9 @@ pub fn build_report(
                         .insert(ins.block_name.clone());
                 }
                 for a in &ins.attributes {
+                    if let Some(o) = &owner {
+                        *per_block_count.entry(o.clone()).or_default() += 1;
+                    }
                     let slot = by_type.entry("ATTRIB").or_insert([0; 4]);
                     bump(slot, &mut ents, space);
                     *per_layer.entry(a.common.layer.clone()).or_default() += 1;
@@ -240,8 +243,26 @@ pub fn build_report(
         let n = object_type_name(o);
         if let Some(rest) = n.strip_prefix("UNKNOWN:") {
             *unknown_objects.entry(rest.to_string()).or_default() += 1;
-        } else if n == "ACAD_PROXY_OBJECT" {
-            *unknown_objects.entry(n.clone()).or_default() += 1;
+        } else if let ObjectType::ProxyObject(px) = o {
+            let class = doc
+                .classes
+                .iter()
+                .find(|c| i32::from(c.class_number) == px.class_id)
+                .map(|c| {
+                    // "AeccLand100|Product Desc: AutoCAD Civil 3D |Company: …" → "AutoCAD Civil 3D"
+                    let product = c
+                        .application_name
+                        .split('|')
+                        .find_map(|p| p.trim().strip_prefix("Product Desc:").map(|v| v.trim().to_string()))
+                        .filter(|v| !v.is_empty());
+                    product.unwrap_or_else(|| {
+                        let app = c.application_name.split('|').next().unwrap_or("").trim();
+                        if app.is_empty() { c.dxf_name.clone() } else { app.to_string() }
+                    })
+                })
+                .or_else(|| (!px.dxf_subclass.is_empty()).then(|| px.dxf_subclass.clone()))
+                .unwrap_or_else(|| format!("classe {}", px.class_id));
+            *unknown_objects.entry(format!("ACAD_PROXY_OBJECT ({class})")).or_default() += 1;
         }
         *object_counts.entry(n).or_default() += 1;
         match o {
@@ -270,7 +291,10 @@ pub fn build_report(
             &mut warnings,
             WarningLevel::Info,
             "object.unknown",
-            format!("{total} objeto(s) não-gráfico(s) desconhecido(s) foram preservados sem interpretação (não afetam o desenho visível, em geral)."),
+            format!(
+                "{total} objeto(s) não-gráfico(s) desconhecido(s) ou proxy foram preservados sem interpretação: {}. Não são entidades e não aparecem no desenho.",
+                unknown_objects.iter().map(|(k, v)| format!("{k} × {v}")).collect::<Vec<_>>().join(", ")
+            ),
         );
     }
     for img in images.iter().filter(|i| i.status == ResolveStatus::Missing) {
@@ -370,6 +394,19 @@ pub fn build_report(
             annotative: s.annotative,
             is_shape_file: s.is_shape_file,
         });
+        let family_only = s.font_file.trim().is_empty() && !s.true_type_font.trim().is_empty();
+        if family_only {
+            let fam = s.true_type_font.trim();
+            let entry = fonts.entry(fam.to_lowercase()).or_insert_with(|| FontRef {
+                name: fam.to_string(),
+                kind: FontKind::TrueType,
+                used_by_styles: vec![],
+                // Família sem arquivo: o Windows resolve pelo nome; verificação real no M1.
+                status: ResolveStatus::NotChecked,
+                resolved_path: None,
+            });
+            entry.used_by_styles.push(s.name.clone());
+        }
         for f in [&s.font_file, &s.big_font_file] {
             let f = f.trim();
             if f.is_empty() {
@@ -411,6 +448,7 @@ pub fn build_report(
 
     // -------------------------------------------------------------- layouts
     let layouts = layouts(doc, &per_block_count, &block_record_by_handle);
+    let suggested_unit = if doc.header.insertion_units == 0 { suggest_unit(&layouts) } else { None };
 
     // ------------------------------------------------------------ desenho
     let h = &doc.header;
@@ -428,13 +466,18 @@ pub fn build_report(
         model_extents: extents(h.model_space_extents_min, h.model_space_extents_max),
         paper_extents: extents(h.paper_space_extents_min, h.paper_space_extents_max),
         annotation_scales,
+        suggested_unit: suggested_unit.clone(),
     };
     if h.insertion_units == 0 {
+        let hint = match &suggested_unit {
+            Some(u) => format!(" Pelas escalas dos viewports, o desenho parece estar em {u}."),
+            None => String::new(),
+        };
         warn(
             &mut warnings,
-            WarningLevel::Info,
+            WarningLevel::Warning,
             "units.unitless",
-            "O desenho não declara unidade ($INSUNITS = 0). Defina mm ou m antes de plotar.".into(),
+            format!("O desenho não declara unidade ($INSUNITS = 0). Defina mm, cm ou m antes de plotar.{hint}"),
         );
     }
 
@@ -724,6 +767,78 @@ fn nesting_depth(
     d
 }
 
+const UNIT_CANDIDATES: &[(&str, f64)] = &[("mm", 1.0), ("cm", 10.0), ("m", 1000.0)];
+
+/// Escalas usuais em arquitetura e paisagismo (denominadores de 1:N).
+const STANDARD_DENOMINATORS: &[f64] = &[
+    1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 75.0, 100.0, 125.0, 200.0, 250.0, 500.0, 750.0, 1000.0,
+    2000.0, 2500.0, 5000.0,
+];
+
+fn is_standard_scale(f: f64) -> bool {
+    // Só reduções (e 1:1): ampliações como 20:1 não são escala de planta.
+    if !(f.is_finite() && f > 0.0 && f <= 1.0 + 1e-9) {
+        return false;
+    }
+    let d = 1.0 / f;
+    STANDARD_DENOMINATORS.iter().any(|s| (d - s).abs() / s < 1e-6)
+}
+
+fn unit_scales(paper_mm_per_model_unit: f64, insunits: i16) -> Vec<UnitScale> {
+    let declared = crate::naming::insunits_to_mm(insunits).map(|mm| {
+        let name = match insunits {
+            4 => "mm",
+            5 => "cm",
+            6 => "m",
+            _ => crate::naming::insunits_name(insunits),
+        };
+        vec![(name, mm)]
+    });
+    let candidates: Vec<(&str, f64)> = declared.unwrap_or_else(|| UNIT_CANDIDATES.to_vec());
+    candidates
+        .into_iter()
+        .filter_map(|(unit, mm)| {
+            let f = paper_mm_per_model_unit / mm;
+            scale_label(f).map(|label| UnitScale {
+                unit: unit.to_string(),
+                scale_label: label,
+                is_standard: is_standard_scale(f),
+            })
+        })
+        .collect()
+}
+
+/// Unidade em que mais viewports caem em escala padrão; empate ou nenhum → None.
+fn suggest_unit(layouts: &[LayoutInfo]) -> Option<String> {
+    let mut score: BTreeMap<String, usize> = BTreeMap::new();
+    let mut total = 0;
+    for v in layouts.iter().flat_map(|l| &l.viewports).filter(|v| !v.is_paper_viewport) {
+        total += 1;
+        for s in v.effective_scales.iter().filter(|s| s.is_standard) {
+            *score.entry(s.unit.clone()).or_default() += 1;
+        }
+    }
+    if total == 0 {
+        return None;
+    }
+    let best = score.values().copied().max()?;
+    let winners: Vec<_> = score.iter().filter(|(_, n)| **n == best).collect();
+    (winners.len() == 1 && best * 2 > total).then(|| winners[0].0.clone())
+}
+
+/// mm de papel por unidade do espaço papel, a partir da escala de plot do layout.
+fn layout_paper_mm_per_unit(l: &acadrust::objects::Layout) -> Option<f64> {
+    if !(l.plot_scale_numerator > 0.0 && l.plot_scale_denominator > 0.0) {
+        return None;
+    }
+    let per = l.plot_scale_numerator / l.plot_scale_denominator;
+    match l.plot_paper_units {
+        0 => Some(per * 25.4), // polegadas
+        1 => Some(per),        // mm
+        _ => None,             // pixels: não se aplica
+    }
+}
+
 fn layouts(
     doc: &CadDocument,
     per_block_count: &HashMap<String, usize>,
@@ -766,6 +881,8 @@ fn layouts(
             twist_deg: vp.twist_angle.to_degrees(),
             scale_factor: factor,
             scale_label: factor.and_then(scale_label),
+            paper_mm_per_model_unit: None,
+            effective_scales: Vec::new(),
             annotation_scale,
             frozen_layers: vp.frozen_layers.len(),
             on: !vp.status.is_off,
@@ -785,6 +902,14 @@ fn layouts(
             vps_by_block.remove(&block.to_lowercase()).unwrap_or_default()
         };
         viewports.sort_by_key(|v| v.id);
+        let mm_per_unit = layout_paper_mm_per_unit(l);
+        for v in viewports.iter_mut().filter(|v| !v.is_paper_viewport) {
+            if let (Some(f), Some(mpu)) = (v.scale_factor, mm_per_unit) {
+                let pm = f * mpu;
+                v.paper_mm_per_model_unit = Some(pm);
+                v.effective_scales = unit_scales(pm, doc.header.insertion_units);
+            }
+        }
         // plot_paper_units: 0 = polegadas, 1 = mm, 2 = pixels. O papel em LAYOUT vem em mm.
         let (mut w, mut hgt) = (l.paper_width, l.paper_height);
         if l.plot_rotation == 1 || l.plot_rotation == 3 {
@@ -807,6 +932,7 @@ fn layouts(
             plot_rotation: l.plot_rotation,
             plot_paper_units: l.plot_paper_units,
             plot_scale,
+            paper_mm_per_unit: mm_per_unit,
             plot_style_sheet: l.plot_style_sheet.clone(),
             viewports,
         });

@@ -214,3 +214,28 @@ fn desempenho_500k() {
     assert!(secs < 10.0, "abrir 500k levou {secs:.2} s");
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn layout_em_unidades_de_desenho_com_plot_1000_50() {
+    let dir = tmp_dir("metros");
+    let path = dir.join("detalhe_m.dwg");
+    cadplot_fixtures::write_doc_dwg(&path, &cadplot_fixtures::planta_metros_layout_escalado()).unwrap();
+    let r = import_file(&path, &ImportOptions::default()).unwrap().report;
+    let lay = r.layouts.iter().find(|l| l.name == "0002").expect("layout 0002");
+    assert_eq!(lay.paper_mm_per_unit, Some(20.0));
+    assert!((lay.paper_width_mm - 800.0).abs() < 1e-9 && (lay.paper_height_mm - 420.0).abs() < 1e-9, "rotação 90° troca largura/altura");
+    let vps: Vec<_> = lay.viewports.iter().filter(|v| !v.is_paper_viewport).collect();
+    assert_eq!(vps.len(), 2);
+    let em_m = |v: &cadplot_core::report::ViewportInfo| {
+        v.effective_scales.iter().find(|s| s.unit == "m").map(|s| (s.scale_label.clone(), s.is_standard)).unwrap()
+    };
+    assert_eq!(vps[0].scale_label.as_deref(), Some("1:1"));
+    assert_eq!(em_m(vps[0]), ("1:50".to_string(), true));
+    assert_eq!(vps[1].scale_label.as_deref(), Some("1:1.5"));
+    assert_eq!(em_m(vps[1]), ("1:75".to_string(), true));
+    // Em mm daria 20:1 — ampliação, não conta como escala de planta.
+    assert!(vps[0].effective_scales.iter().any(|s| s.unit == "mm" && s.scale_label == "20:1" && !s.is_standard));
+    assert_eq!(r.drawing.suggested_unit.as_deref(), Some("m"));
+    assert!(r.warnings.iter().any(|w| w.key == "units.unitless" && w.message.contains("em m")));
+    std::fs::remove_dir_all(&dir).ok();
+}

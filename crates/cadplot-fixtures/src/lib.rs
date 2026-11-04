@@ -356,3 +356,33 @@ pub fn planta_grande(n_entities: usize) -> CadDocument {
 pub fn write_doc_dwg(path: &Path, doc: &CadDocument) -> Result<(), String> {
     DwgWriter::write_to_file(path, doc).map_err(|e| e.to_string())
 }
+
+/// Padrão visto em arquivo real de detalhamento: desenho em METROS sem
+/// $INSUNITS, layout montado em unidades de desenho e plotado em 1000:50
+/// (1 unidade do papel = 20 mm). Viewports 1:1 e 1:1,5 no papel/modelo
+/// viram 1:50 e 1:75 reais.
+pub fn planta_metros_layout_escalado() -> CadDocument {
+    let mut doc = CadDocument::with_version(DxfVersion::AC1027);
+    doc.header.insertion_units = 0;
+    doc.header.measurement = 1;
+    layer(&mut doc, "PA-PAGINAÇÃO DE PISO", 1, None, |_| {});
+    add(&mut doc, EntityType::Line(Line::from_coords(0.0, 0.0, 0.0, 5.0, 0.0, 0.0)), "PA-PAGINAÇÃO DE PISO");
+    let lh = doc.add_layout("0002").expect("layout");
+    if let Some(ObjectType::Layout(l)) = doc.objects.get_mut(&lh) {
+        l.paper_size = "UserDefinedMetric (420.00 x 800.00MM)".into();
+        l.paper_width = 420.0;
+        l.paper_height = 800.0;
+        l.plot_rotation = 1;
+        l.plot_paper_units = 1;
+        l.plot_scale_numerator = 1000.0;
+        l.plot_scale_denominator = 50.0;
+    }
+    for (id, x, scale) in [(2_i16, 5.0, 1.0), (3, 15.0, 1.0 / 1.5)] {
+        let mut vp = Viewport::with_size(Vector3::new(x, 10.0, 0.0), 8.0, 6.0);
+        vp.view_center = Vector3::new(2.5, 0.0, 0.0);
+        vp.id = id;
+        vp = vp.with_scale(scale);
+        doc.add_entity_to_layout(EntityType::Viewport(Box::new(vp)), "0002").expect("viewport");
+    }
+    doc
+}

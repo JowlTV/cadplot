@@ -229,26 +229,42 @@ pub fn scale_label(factor: f64) -> Option<String> {
     if !(factor.is_finite() && factor > 0.0) {
         return None;
     }
+    // Tolerância relativa: viewports guardam altura/altura da vista em double e
+    // 1:50 costuma vir como 1:50,0000004.
+    let close = |v: f64| (v - v.round()).abs() <= 1e-6 * v.abs().max(1.0) * 100.0;
     if factor >= 1.0 {
         let n = factor;
-        Some(if (n - n.round()).abs() < 1e-6 {
+        Some(if close(n) {
             format!("{}:1", n.round() as i64)
         } else {
-            format!("{n:.4}:1")
+            format!("{}:1", trim_dec(n))
         })
     } else {
         let d = 1.0 / factor;
-        Some(if (d - d.round()).abs() < 1e-6 {
+        Some(if close(d) {
             format!("1:{}", d.round() as i64)
         } else {
-            format!("1:{d:.4}")
+            format!("1:{}", trim_dec(d))
         })
     }
+}
+
+fn trim_dec(v: f64) -> String {
+    let s = format!("{v:.4}");
+    s.trim_end_matches('0').trim_end_matches('.').to_string()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn escalas_com_ruido() {
+        assert_eq!(scale_label(1.0 / 50.000_000_4).as_deref(), Some("1:50"));
+        assert_eq!(scale_label(20.000_000_3).as_deref(), Some("20:1"));
+        assert_eq!(scale_label(1.0 / 1.5).as_deref(), Some("1:1.5"));
+        assert_eq!(scale_label(1.0 / 12.5).as_deref(), Some("1:12.5"));
+    }
 
     #[test]
     fn escalas() {
