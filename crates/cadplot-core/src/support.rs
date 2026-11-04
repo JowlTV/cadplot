@@ -44,10 +44,13 @@ pub fn support_for(type_name: &str) -> SupportLevel {
         "LINE" | "LWPOLYLINE" | "POLYLINE_2D" | "ARC" | "CIRCLE" | "ELLIPSE" | "SPLINE"
         | "TEXT" | "INSERT" | "ATTRIB" | "POINT" | "SOLID" | "VIEWPORT" | "LEADER"
         | "XLINE" | "RAY" => Render,
+        // ATTDEF solta no modelo/papel aparece como a etiqueta (tag), como no AutoCAD;
+        // dentro de definição de bloco não é desenhada nas inserções (o ATTRIB é que aparece).
+        "ATTDEF" => Partial,
         // Formatação básica, padrões de hachura, bloco anônimo da cota etc.
         "MTEXT" | "HATCH" | "DIMENSION" | "MULTILEADER" | "ACAD_TABLE" | "WIPEOUT"
         | "MLINE" | "TOLERANCE" | "SHAPE" | "POLYLINE" | "POLYLINE_3D" => Partial,
-        "ATTDEF" | "SEQEND" | "BLOCK" | "ENDBLK" => Structural,
+        "SEQEND" | "BLOCK" | "ENDBLK" => Structural,
         "UNKNOWN" => Unknown,
         _ => OutOfScope,
     }

@@ -28,6 +28,14 @@ fn status(s: ResolveStatus) -> &'static str {
     }
 }
 
+fn fmt_num(v: f64) -> String {
+    if (v - v.round()).abs() < 1e-9 {
+        format!("{}", v.round() as i64)
+    } else {
+        format!("{v:.4}").trim_end_matches('0').trim_end_matches('.').replace('.', ",")
+    }
+}
+
 /// Formata o relatório. `max_rows` limita listas longas (camadas, blocos); 0 = sem limite.
 pub fn render(r: &ImportReport, max_rows: usize) -> String {
     let lim = |n: usize| if max_rows == 0 { n } else { n.min(max_rows) };
@@ -76,6 +84,9 @@ pub fn render(r: &ImportReport, max_rows: usize) -> String {
     let d = &r.drawing;
     let _ = writeln!(o, "\nDESENHO");
     let _ = writeln!(o, "  $INSUNITS: {} ({})   $MEASUREMENT: {}", d.insunits_code, d.insunits_name, if d.measurement == 1 { "métrico" } else { "imperial" });
+    if let Some(u) = &d.suggested_unit {
+        let _ = writeln!(o, "  unidade sugerida pelas escalas dos viewports: {u} (confirme antes de plotar)");
+    }
     let _ = writeln!(o, "  $CANNOSCALE: {} (valor {})   $LTSCALE: {}   $PSLTSCALE: {}", d.cannoscale, d.cannoscale_value, d.ltscale, yes(d.psltscale));
     if let Some(x) = d.model_extents {
         let _ = writeln!(o, "  extensão (modelo): ({:.3}, {:.3}) – ({:.3}, {:.3})", x[0], x[1], x[2], x[3]);
@@ -136,23 +147,44 @@ pub fn render(r: &ImportReport, max_rows: usize) -> String {
             let _ = writeln!(o, "  [Modelo] {} entidades", l.entity_count);
             continue;
         }
-        let _ = writeln!(
-            o,
-            "  [{}] papel \"{}\" {:.1} × {:.1} mm, rotação {}, escala de plot {}, {} entidades",
-            l.name, l.paper_size, l.paper_width_mm, l.paper_height_mm, l.plot_rotation * 90, l.plot_scale, l.entity_count
-        );
+        if l.paper_width_mm > 0.0 && l.paper_height_mm > 0.0 {
+            let per_unit = match l.paper_mm_per_unit {
+                Some(m) if (m - 1.0).abs() > 1e-9 => format!(" (1 unidade do papel = {} mm)", fmt_num(m)),
+                _ => String::new(),
+            };
+            let _ = writeln!(
+                o,
+                "  [{}] papel \"{}\" {:.1} × {:.1} mm, rotação {}, escala de plot {}{}, {} entidades",
+                l.name, l.paper_size, l.paper_width_mm, l.paper_height_mm, l.plot_rotation * 90, l.plot_scale, per_unit, l.entity_count
+            );
+        } else {
+            let _ = writeln!(o, "  [{}] papel não configurado, {} entidades", l.name, l.entity_count);
+        }
         for v in &l.viewports {
             if v.is_paper_viewport {
                 continue;
             }
+            let mm_size = l.paper_mm_per_unit.map(|m| format!(" ({:.0} × {:.0} mm)", v.width * m, v.height * m)).unwrap_or_default();
+            let eff = if v.effective_scales.is_empty() {
+                String::new()
+            } else {
+                let parts: Vec<String> = v
+                    .effective_scales
+                    .iter()
+                    .map(|s| format!("{} se em {}{}", s.scale_label, s.unit, if s.is_standard { " ✓" } else { "" }))
+                    .collect();
+                format!(" → no papel: {}", parts.join(" | "))
+            };
             let _ = writeln!(
                 o,
-                "      viewport {} (id {}): {:.1} × {:.1} no papel, escala {} , anotativa {}, camadas congeladas {}{}{}",
+                "      viewport {} (id {}): {:.2} × {:.2} unid. de papel{}, papel/modelo {}{}, anotativa {}, camadas congeladas {}{}{}",
                 v.handle,
                 v.id,
                 v.width,
                 v.height,
+                mm_size,
                 v.scale_label.as_deref().unwrap_or("?"),
+                eff,
                 v.annotation_scale.as_deref().unwrap_or("—"),
                 v.frozen_layers,
                 if v.locked { ", travada" } else { "" },

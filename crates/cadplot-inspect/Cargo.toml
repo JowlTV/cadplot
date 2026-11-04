@@ -14,3 +14,14 @@ path = "src/main.rs"
 [dependencies]
 cadplot-core = { path = "../cadplot-core" }
 serde_json.workspace = true
+
+[target.'cfg(windows)'.build-dependencies]
+# Metadados de versão no .exe (nome do produto, empresa, descrição): reduz falso positivo de antivírus.
+winresource = "0.1"
+
+[package.metadata.winresource]
+ProductName = "CadPlot"
+FileDescription = "CadPlot — relatório de importação de DWG/DXF"
+CompanyName = "JowlTV"
+LegalCopyright = "© 2026 JowlTV"
+OriginalFilename = "cadplot-inspect.exe"

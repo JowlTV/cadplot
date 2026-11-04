@@ -11,7 +11,7 @@ um arquivo separado (`desenho.cadplot.json`).
 
 | Milestone | Conteúdo | Estado |
 |---|---|---|
-| M0 | Spike de leitura (relatório de importação) e escolha do gerador de PDF | em andamento |
+| M0 | Spike de leitura (relatório de importação) e escolha do gerador de PDF | entregue, aguardando teste com o DWG real |
 | M1 | Visualizador e painel de camadas | — |
 | M2 | Inspetor e busca | — |
 | M3 | Regras de limpeza e arquivo de estado JSON | — |

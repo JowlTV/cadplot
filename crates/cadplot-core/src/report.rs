@@ -102,12 +102,17 @@ pub struct DrawingInfo {
     pub cannoscale: String,
     /// $CANNOSCALEVALUE (papel/desenho; 1:50 → 0,02).
     pub cannoscale_value: f64,
+    /// De onde veio o CANNOSCALE (dicionário de variáveis ou cabeçalho).
+    pub cannoscale_source: String,
     pub ltscale: f64,
     pub psltscale: bool,
     pub model_extents: Option<[f64; 4]>,
     pub paper_extents: Option<[f64; 4]>,
     /// Escalas de anotação definidas no desenho (ACAD_SCALELIST).
     pub annotation_scales: Vec<ScaleInfo>,
+    /// Quando $INSUNITS = 0: unidade (mm, cm, m) em que as escalas efetivas dos
+    /// viewports caem em escalas padrão. É uma sugestão, nunca aplicada sozinha.
+    pub suggested_unit: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -200,6 +205,10 @@ pub struct LayoutInfo {
     pub plot_rotation: i16,
     pub plot_paper_units: i16,
     pub plot_scale: String,
+    /// Milímetros de papel por unidade do espaço papel (escala de plot do layout).
+    /// Normalmente 1 (layout em mm, plot 1:1); arquivos que montam o papel em
+    /// unidades de desenho usam, por exemplo, 1000:50 → 20 mm por unidade.
+    pub paper_mm_per_unit: Option<f64>,
     pub plot_style_sheet: String,
     pub viewports: Vec<ViewportInfo>,
 }
@@ -218,13 +227,27 @@ pub struct ViewportInfo {
     pub twist_deg: f64,
     /// Unidades de papel por unidade de desenho (altura / view_height).
     pub scale_factor: Option<f64>,
-    /// Escala legível ("1:50"), assumindo papel e desenho na mesma unidade.
+    /// Razão espaço papel / espaço modelo ("1:50"), como o AutoCAD mostra na
+    /// propriedade "Standard scale" do viewport.
     pub scale_label: Option<String>,
+    /// Milímetros no papel por unidade do modelo (fator do viewport × escala de plot do layout).
+    pub paper_mm_per_model_unit: Option<f64>,
+    /// Escala real no papel, por unidade possível do desenho (mm, cm, m).
+    /// Quando $INSUNITS é declarado, só a unidade declarada aparece.
+    pub effective_scales: Vec<UnitScale>,
     pub annotation_scale: Option<String>,
     pub frozen_layers: usize,
     pub on: bool,
     pub locked: bool,
     pub non_rectangular_clip: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnitScale {
+    pub unit: String,
+    pub scale_label: String,
+    /// A escala cai numa escala padrão de arquitetura (1:20, 1:50, 1:75, 1:100…).
+    pub is_standard: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
