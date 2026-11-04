@@ -472,21 +472,27 @@ pub fn build_report(
         })
         .collect();
     for n in doc.notifications.iter() {
+        let severity = if is_informational(&n.message) {
+            "info".to_string()
+        } else {
+            format!("{:?}", n.notification_type).to_lowercase()
+        };
         diagnostics.push(Diagnostic {
             source: "notification".into(),
-            severity: format!("{:?}", n.notification_type).to_lowercase(),
+            severity,
             code: format!("{:?}", n.notification_type),
             message: n.message.clone(),
             handle: None,
             record_type: None,
         });
     }
-    if !diagnostics.is_empty() {
+    let relevant = diagnostics.iter().filter(|d| d.severity != "info").count();
+    if relevant > 0 {
         warn(
             &mut warnings,
-            WarningLevel::Info,
+            WarningLevel::Warning,
             "read.diagnostics",
-            format!("O leitor registrou {} diagnóstico(s); veja a seção de diagnósticos.", diagnostics.len()),
+            format!("O leitor registrou {relevant} diagnóstico(s) relevante(s); veja a seção de diagnósticos."),
         );
     }
 
@@ -538,6 +544,18 @@ fn resolve_cannoscale(doc: &CadDocument) -> (String, f64, &'static str) {
         .or_else(|| parse_scale_name(&name))
         .unwrap_or(h.annotation_scale_value);
     (name, value, source)
+}
+
+/// Mensagens do acadrust que são só registro de progresso da leitura, não problemas.
+fn is_informational(msg: &str) -> bool {
+    const PREFIXES: &[&str] = &[
+        "Reading DWG file version",
+        "AC18 inner header",
+        "AC18: Read",
+        "AC21 ",
+        "AC21:",
+    ];
+    PREFIXES.iter().any(|p| msg.starts_with(p))
 }
 
 /// "1:50" → 0,02; "2:1" → 2. Usado quando não existe o objeto SCALE correspondente.

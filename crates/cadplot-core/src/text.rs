@@ -136,11 +136,15 @@ pub fn render(r: &ImportReport, max_rows: usize) -> String {
             let _ = writeln!(o, "  [Modelo] {} entidades", l.entity_count);
             continue;
         }
-        let _ = writeln!(
-            o,
-            "  [{}] papel \"{}\" {:.1} × {:.1} mm, rotação {}, escala de plot {}, {} entidades",
-            l.name, l.paper_size, l.paper_width_mm, l.paper_height_mm, l.plot_rotation * 90, l.plot_scale, l.entity_count
-        );
+        if l.paper_width_mm > 0.0 && l.paper_height_mm > 0.0 {
+            let _ = writeln!(
+                o,
+                "  [{}] papel \"{}\" {:.1} × {:.1} mm, rotação {}, escala de plot {}, {} entidades",
+                l.name, l.paper_size, l.paper_width_mm, l.paper_height_mm, l.plot_rotation * 90, l.plot_scale, l.entity_count
+            );
+        } else {
+            let _ = writeln!(o, "  [{}] papel não configurado, {} entidades", l.name, l.entity_count);
+        }
         for v in &l.viewports {
             if v.is_paper_viewport {
                 continue;

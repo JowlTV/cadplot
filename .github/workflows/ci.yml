@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**", "fix/**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    name: Testes (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace
+      - name: Desempenho (500 mil entidades, release)
+        run: cargo test --release -p cadplot-core --test import_fixtures -- --ignored desempenho --nocapture
+
+  windows:
+    name: Testes e build (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Testes
+        run: cargo test --workspace
+      - name: Desempenho (500 mil entidades, release)
+        run: cargo test --release -p cadplot-core --test import_fixtures -- --ignored desempenho --nocapture
+      - name: Build release do cadplot-inspect
+        run: cargo build --release -p cadplot-inspect
+      - name: Fixtures sintéticos + relatório no Windows
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out\fixtures | Out-Null
+          cargo run --release -p cadplot-fixtures --example gerar -- out\fixtures
+          .\target\release\cadplot-inspect.exe out\fixtures\planta_AC1032.dwg --linhas 15 --json out\fixtures\planta_AC1032.report.json
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Pacote e SHA-256
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target\release\cadplot-inspect.exe dist\
+          Copy-Item docs\TESTING.md dist\
+          Copy-Item -Recurse out\fixtures dist\fixtures-sinteticos
+          $h = (Get-FileHash dist\cadplot-inspect.exe -Algorithm SHA256).Hash.ToLower()
+          "$h  cadplot-inspect.exe" | Out-File -Encoding ascii dist\SHA256SUMS.txt
+          Get-Content dist\SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cadplot-inspect-windows-x64
+          path: dist/
+      - name: Release (tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/cadplot-inspect.exe
+            dist/SHA256SUMS.txt
+          body: |
+            Build do CadPlot para Windows x64. Relatório do milestone em `docs/reports/`, instruções em `docs/TESTING.md`.
+            SHA-256 dos binários em `SHA256SUMS.txt`.
