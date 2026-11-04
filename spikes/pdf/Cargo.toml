@@ -1,7 +1,9 @@
 [package]
 name = "cadplot-pdf-spike"
+description = "M0: gera o PDF de referência com printpdf para comparar com o print-to-PDF do Chromium/WebView2"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
+printpdf = { version = "0.12.8", default-features = false }
