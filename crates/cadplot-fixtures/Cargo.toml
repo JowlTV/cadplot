@@ -1,0 +1,11 @@
+[package]
+name = "cadplot-fixtures"
+description = "Gerador de desenhos sintéticos para testes (NUNCA usado pelo app)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+acadrust.workspace = true

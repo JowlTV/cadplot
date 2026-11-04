@@ -1,0 +1,16 @@
+[package]
+name = "cadplot-inspect"
+description = "CadPlot: relatório de importação de DWG/DXF pela linha de comando"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "cadplot-inspect"
+path = "src/main.rs"
+
+[dependencies]
+cadplot-core = { path = "../cadplot-core" }
+serde_json.workspace = true

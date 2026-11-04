@@ -1,0 +1,19 @@
+[package]
+name = "cadplot-core"
+description = "Núcleo do CadPlot: leitura somente-leitura de DWG/DXF e relatório de importação"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+acadrust.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+# Gerador de fixtures sintéticos. Só existe nos testes: o núcleo nunca grava DWG/DXF.
+cadplot-fixtures = { path = "../cadplot-fixtures" }

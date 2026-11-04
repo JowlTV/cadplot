@@ -1,0 +1,55 @@
+# ----------------------------------------------------------------------
+# ARQUIVOS DE CLIENTES: NUNCA COMMITAR
+# samples/ e tests/corpus/ guardam DWG/DXF reais e saídas de plot
+# para testes locais. Nada de lá entra no repositório.
+# ----------------------------------------------------------------------
+samples/**/*.dwg
+samples/**/*.DWG
+samples/**/*.dxf
+samples/**/*.DXF
+samples/**/*.pdf
+samples/**/*.PDF
+samples/**/*.png
+samples/**/*.PNG
+samples/**/*.tif
+samples/**/*.TIF
+samples/**/*.tiff
+samples/**/*.TIFF
+tests/corpus/**/*.dwg
+tests/corpus/**/*.DWG
+tests/corpus/**/*.dxf
+tests/corpus/**/*.DXF
+tests/corpus/**/*.pdf
+tests/corpus/**/*.PDF
+tests/corpus/**/*.png
+tests/corpus/**/*.PNG
+tests/corpus/**/*.tif
+tests/corpus/**/*.TIF
+tests/corpus/**/*.tiff
+tests/corpus/**/*.TIFF
+# Relatórios gerados a partir de arquivos de clientes também ficam fora
+samples/**/*.report.json
+samples/**/*.report.txt
+samples/**/*.cadplot.json
+tests/corpus/**/*.report.json
+tests/corpus/**/*.report.txt
+
+# Rust
+/target/
+**/target/
+
+# Node / front-end (M1+)
+node_modules/
+dist/
+
+# Saídas temporárias de spikes e fixtures gerados
+/out/
+spikes/pdf/out/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/

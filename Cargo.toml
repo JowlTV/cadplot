@@ -1,0 +1,37 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/cadplot-core",
+    "crates/cadplot-inspect",
+    "crates/cadplot-fixtures",
+    "spikes/pdf",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.85"
+authors = ["JowlTV"]
+# Licença final do produto ainda não definida (decisão pendente com o usuário).
+publish = false
+
+[workspace.dependencies]
+# Leitura de DWG/DXF. MPL-2.0, usada sem modificações.
+acadrust = "=0.6.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "2"
+
+[profile.release]
+# Sem packers, sem ofuscação; símbolos removidos apenas pelo strip padrão.
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+debug = false
+panic = "unwind"
+
+[profile.dev.package."*"]
+# Dependências otimizadas mesmo em debug: o parser fica muito mais rápido nos testes.
+opt-level = 2
