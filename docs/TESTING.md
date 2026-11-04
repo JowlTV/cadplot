@@ -21,7 +21,7 @@ artefato **cadplot-inspect-windows-x64**. O zip contém:
 - `fixtures-sinteticos\` (desenhos gerados por código, para comparar)
 - este `TESTING.md`
 
-Com a tag `v0.0.0`, o mesmo `.exe` também fica na página **Releases**.
+Depois do merge do M0 e da tag `v0.0.0`, o mesmo `.exe` também fica na página **Releases**.
 
 **Opção B — compilar.**
 
