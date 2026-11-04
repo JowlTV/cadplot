@@ -102,6 +102,8 @@ pub struct DrawingInfo {
     pub cannoscale: String,
     /// $CANNOSCALEVALUE (papel/desenho; 1:50 → 0,02).
     pub cannoscale_value: f64,
+    /// De onde veio o CANNOSCALE (dicionário de variáveis ou cabeçalho).
+    pub cannoscale_source: String,
     pub ltscale: f64,
     pub psltscale: bool,
     pub model_extents: Option<[f64; 4]>,

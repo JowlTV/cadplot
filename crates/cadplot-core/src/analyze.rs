@@ -414,13 +414,15 @@ pub fn build_report(
 
     // ------------------------------------------------------------ desenho
     let h = &doc.header;
+    let cannoscale = resolve_cannoscale(doc);
     let drawing = DrawingInfo {
         insunits_code: h.insertion_units,
         insunits_name: insunits_name(h.insertion_units).to_string(),
         measurement: h.measurement,
         linear_unit_format: h.linear_unit_format,
-        cannoscale: h.current_annotation_scale.clone(),
-        cannoscale_value: h.annotation_scale_value,
+        cannoscale: cannoscale.0,
+        cannoscale_value: cannoscale.1,
+        cannoscale_source: cannoscale.2.into(),
         ltscale: h.linetype_scale,
         psltscale: h.paper_space_linetype_scaling,
         model_extents: extents(h.model_space_extents_min, h.model_space_extents_max),
@@ -515,6 +517,28 @@ pub fn build_report(
     }
 }
 
+/// CANNOSCALE: no DWG e no DXF o AutoCAD guarda o valor no
+/// AcDbVariableDictionary. O leitor DWG do acadrust já reflete isso no
+/// cabeçalho; o leitor DXF não (0.6.8), então resolvemos aqui.
+fn resolve_cannoscale(doc: &CadDocument) -> (String, f64, &'static str) {
+    let h = &doc.header;
+    let (name, source) = match doc.drawing_variable("CANNOSCALE") {
+        Some(v) if !v.trim().is_empty() => (v.to_string(), "AcDbVariableDictionary"),
+        _ => (h.current_annotation_scale.clone(), "cabeçalho"),
+    };
+    let value = doc
+        .objects
+        .values()
+        .find_map(|o| match o {
+            ObjectType::Scale(s) if s.name.eq_ignore_ascii_case(&name) && s.drawing_units != 0.0 => {
+                Some(s.paper_units / s.drawing_units)
+            }
+            _ => None,
+        })
+        .unwrap_or(if name == h.current_annotation_scale { h.annotation_scale_value } else { f64::NAN });
+    (name, value, source)
+}
+
 fn warn(list: &mut Vec<Warning>, level: WarningLevel, key: &str, message: String) {
     list.push(Warning {
         level,
@@ -590,8 +614,8 @@ pub fn layer_prefix(name: &str) -> Option<&str> {
 fn prefix_groups(layers: &[LayerInfo]) -> Vec<PrefixGroup> {
     let mut map: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     for l in layers {
-        let p = layer_prefix(&l.name).unwrap_or("(sem prefixo)");
-        let e = map.entry(p.to_uppercase()).or_default();
+        let key = layer_prefix(&l.name).map_or_else(|| "(sem prefixo)".to_string(), str::to_uppercase);
+        let e = map.entry(key).or_default();
         e.0 += 1;
         e.1 += l.entity_count;
     }
