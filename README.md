@@ -12,7 +12,7 @@ um arquivo separado (`desenho.cadplot.json`).
 | Milestone | Conteúdo | Estado |
 |---|---|---|
 | M0 | Spike de leitura (relatório de importação) e escolha do gerador de PDF | entregue, aguardando teste com o DWG real |
-| M1 | Visualizador e painel de camadas | — |
+| M1 | Visualizador e painel de camadas | prévia em `feat/m1-viewer` (espaço modelo, camadas) |
 | M2 | Inspetor e busca | — |
 | M3 | Regras de limpeza e arquivo de estado JSON | — |
 | M4 | Plotagem em PDF e PNG em escala | — |
@@ -21,7 +21,8 @@ um arquivo separado (`desenho.cadplot.json`).
 ## Estrutura
 
 ```
-crates/cadplot-core       núcleo: leitura somente-leitura, relatório de importação
+apps/desktop              app Tauri 2 (interface React + WebGL2; src-tauri = processo nativo)
+crates/cadplot-core       núcleo: leitura somente-leitura, relatório de importação, cena de visualização
 crates/cadplot-inspect    CLI: cadplot-inspect <arquivo.dwg|dxf>
 crates/cadplot-fixtures   gerador de desenhos sintéticos para testes (nunca usado pelo app)
 spikes/pdf                comparação de geradores de PDF (M0)
