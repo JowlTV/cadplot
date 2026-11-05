@@ -12,6 +12,7 @@ pub mod import;
 pub mod naming;
 pub mod report;
 pub mod resolve;
+pub mod scene;
 pub mod source;
 pub mod support;
 pub mod text;
