@@ -11,6 +11,7 @@
 //!   --codepage <nome>     codepage padrão para DXF antigo sem $DWGCODEPAGE (ex.: ANSI_1252)
 //!   --sem-recuperacao     não tenta o modo de recuperação se a leitura estrita falhar
 //!   --linhas <n>          máximo de linhas por lista no texto (padrão 60, 0 = tudo)
+//!   --cena <arquivo.cps>  grava a cena do espaço modelo (formato binário do visualizador)
 //!
 //! O desenho de origem é aberto somente para leitura. As saídas são arquivos
 //! novos; o programa se recusa a gravar por cima do próprio desenho.
@@ -27,6 +28,7 @@ struct Args {
     txt_beside: bool,
     opts: ImportOptions,
     max_rows: usize,
+    scene: Option<PathBuf>,
 }
 
 fn usage() -> &'static str {
@@ -41,6 +43,7 @@ fn parse_args() -> Result<Args, String> {
         txt_beside: false,
         opts: ImportOptions::default(),
         max_rows: 60,
+        scene: None,
     };
     let mut it = std::env::args_os().skip(1);
     while let Some(arg) = it.next() {
@@ -51,6 +54,7 @@ fn parse_args() -> Result<Args, String> {
             "--json" => a.json = Some(value("--json")?),
             "--json-ao-lado" => a.json_beside = true,
             "--txt-ao-lado" => a.txt_beside = true,
+            "--cena" => a.scene = Some(value("--cena")?),
             "--fontes" => a.opts.search_dirs.push(value("--fontes")?),
             "--codepage" => a.opts.default_dxf_encoding = Some(value("--codepage")?.to_string_lossy().into()),
             "--sem-recuperacao" => a.opts.allow_recovery = false,
@@ -142,6 +146,28 @@ fn main() -> ExitCode {
                         }
                     }
                 }
+                if let Some(p) = &args.scene {
+                    let t = std::time::Instant::now();
+                    let scene = cadplot_core::scene::build_model_scene(&imported.document);
+                    let report = serde_json::to_value(r).ok();
+                    let bytes = scene.to_bytes(report.as_ref());
+                    let res = ensure_not_source(p, input)
+                        .and_then(|_| std::fs::write(p, &bytes).map_err(|e| format!("não foi possível gravar {}: {e}", p.display())));
+                    match res {
+                        Ok(()) => eprintln!(
+                            "cena gravada em {} ({:.1} MB, {} lotes, {} textos, {:.0} ms)",
+                            p.display(),
+                            bytes.len() as f64 / 1e6,
+                            scene.meta.batches.len(),
+                            scene.meta.texts.len(),
+                            t.elapsed().as_secs_f64() * 1000.0
+                        ),
+                        Err(e) => {
+                            eprintln!("{e}");
+                            failed = true;
+                        }
+                    }
+                }
                 if r.read.recovery_mode {
                     failed = true;
                 }
@@ -183,6 +209,7 @@ mod tests {
         assert!(ensure_not_source(src, src).is_err());
         assert!(ensure_not_source(Path::new("outra.dxf"), src).is_err());
         assert!(ensure_not_source(Path::new("planta.dwg.report.json"), src).is_ok());
+        assert!(ensure_not_source(Path::new("planta.cps"), src).is_ok());
     }
 
     #[test]
