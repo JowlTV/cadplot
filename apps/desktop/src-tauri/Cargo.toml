@@ -1,0 +1,21 @@
+[package]
+name = "cadplot-app"
+description = "CadPlot — visualizador e plotter de DWG/DXF (somente leitura)"
+version = "0.1.0"
+edition.workspace = true
+rust-version = "1.90"
+authors.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "cadplot"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+cadplot-core = { path = "../../../crates/cadplot-core" }
+serde_json.workspace = true
+tauri = { version = "2.12", features = [] }
+tauri-plugin-dialog = "2.8"

@@ -53,3 +53,7 @@ desktop.ini
 *.swp
 .idea/
 .vscode/
+
+# Tauri
+apps/desktop/src-tauri/gen/
+apps/desktop/dist/

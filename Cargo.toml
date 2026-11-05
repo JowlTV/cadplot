@@ -5,6 +5,7 @@ members = [
     "crates/cadplot-inspect",
     "crates/cadplot-fixtures",
     "spikes/pdf",
+    "apps/desktop/src-tauri",
 ]
 
 [workspace.package]

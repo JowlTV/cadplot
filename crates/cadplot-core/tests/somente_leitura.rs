@@ -58,7 +58,7 @@ fn scan(dir: &Path, root: &Path, hits: &mut Vec<String>) {
 fn nucleo_e_cli_nao_gravam_dwg_dxf() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().unwrap();
     let mut hits = Vec::new();
-    for d in ["crates/cadplot-core/src", "crates/cadplot-inspect/src"] {
+    for d in ["crates/cadplot-core/src", "crates/cadplot-inspect/src", "apps/desktop/src-tauri/src"] {
         let p = root.join(d);
         if p.exists() {
             scan(&p, &root, &mut hits);
